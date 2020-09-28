@@ -1,0 +1,228 @@
+---
+title: "A study of the relationship between age and income"
+author: "Tauriel Wu"
+date: "2020,09,25"
+categories: ["R"]
+bibliography: "reference.bib"
+tags: ["R Markdown", "plot", "regression"]
+---
+
+-Code and data supporting this analysis is available at:https://github.com/Tauriel-Wu/A-study-of-the-relationship-between-age-and-income.git
+
+# Abstract: 
+We analyzed the 2019 CES Web data, selected the variables, and made a linear regression model. We found that their is no linear relationship between age and income, which can help us evaluate the quality of life of people with different ages. 
+
+
+# Introduction
+- Income is one of the most important determinant of living standard. As a developed country, we faces the same problem as most other developed countries --aging of population. It leads to a challenge to our country, since we should not only consider the country's spending and financial issues, but also need to be concerned about the living conditions about elders. From other studies, they estimate that the number of elder people in Canada will increase to 23% of our total population in 2030. (@milligan2008evolution) Therefore, it is really important to know the economic situation of elder people, since if we estimate that the elder people may face financial problems, our country have to find a solution as soon as possible. Base on our study, we don't find that there exist a linear relationship between age and income. 
+- In this study, we investigated the 2019 Canadian Election Study, the data I analyzed is from ex post-data of an election, it is still important since it contains a lot of useful information and by analyzing it, we can learn more about the political situation recently.(Hodgetts, Paul, and Rohan Alexander. “Cesr: An R Package for the Canadian Election Study.” SocArXiv, 3 Sept. 2020. Web.) I looked at income(in canadian dollar) and age(in year). Base on these two variables, we found that there is no linear relationship between age and income. 
+
+- We analyzed the data about income and age independently first. After cleaned the missing value of these two variables, we found that the income of most people is in the range of 3 to 12 million, and the most people in Canada is between 30 - 60 years old. When we combine two variables together, we analyzed that there is not a significant relationship between them. This is may because our data still includes a lot of wrong values which may largely impact the result. Additionally, we did not concern about some other important determinant of income such as people's education, race, gender, and living area.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("skimr")
+install.packages("devtools")
+install.packages("visdat")
+devtools::install_github("hodgettsp/cesR")
+library(tidyverse)
+library(cesR)
+library(knitr)
+library(visdat)
+library(skimr)
+library(dplyr)
+library(labelled)
+```
+
+# Data discussion
+
+The 2019 Canadian Election Study is an online survey that included many variables related to election. It is a valuable resource for people to study public opinion and public situation. We choose some important variables among the big data package to analyze. The variables we choose are age, province, gender, education, religion, income, property and the categories of the income. Only age and income are the numerical variables. The missing rate of the categories of the income is the highest, but we still have 12266 missing data of the income. We have to clean the data first since the missing values will impact our analysis. Additionally, the spread of income is really large, but we want to focus on the normal people, so we will only study the income in a certain range.
+
+
+```{r}
+get_ces("ces2019_web")
+ces2019_web <- to_factor(ces2019_web)
+head(ces2019_web)
+```
+
+```{r}
+mydata <- ces2019_web %>%
+  select(cps19_age, cps19_province, cps19_gender, cps19_education, cps19_religion,  cps19_income_number, cps19_property_1, cps19_income_cat)
+
+head(mydata)
+```
+
+
+```{r}
+variables_in_data <- data.frame( personal_information = c("age", "gender", "province", "education", "religion"), about_ecomony = c("income", "property", "income_category", "", ""))
+variables_in_data
+
+```
+
+
+```{r}
+skimr::skim(mydata)
+```
+```{r}
+mydata_f <- mydata %>% drop_na(cps19_income_number, cps19_age)
+mydata_f
+```
+
+```{r}
+summary(mydata_f$cps19_income_number)
+```
+
+```{r}
+sd_income <- sd(mydata_f$cps19_income_number)
+var_income <- sd_income^2
+iqr_income <- IQR(mydata_f$cps19_income_number)
+sd_income
+var_income
+iqr_income
+maxi <- quantile(mydata_f$cps19_income_number, 0.75) + 1.5*iqr_income
+maxi
+mini <- quantile(mydata_f$cps19_income_number, 0.25) - 1.5*iqr_income
+mini
+```
+
+
+```{r}
+mydata_f <- 
+  mydata_f %>% 
+  filter( cps19_income_number < 1000000)
+mydata_f
+
+```
+
+# Graph
+
+### Income
+```{r,echo = FALSE}
+income_his <- mydata_f %>% 
+  ggplot(aes(x = cps19_income_number)) +
+  geom_histogram(color="black", fill="pink")+
+  labs(x = "income ($)",
+       title = "Histogram of income ")+ 
+  theme_classic()
+income_his
+```
+
+
+### Age
+
+```{r,echo = FALSE}
+age_box <- ggplot(mydata_f, aes(x = "", y = cps19_age))+
+  geom_boxplot(color="black", fill="pink")+
+  labs(x = "Age", y = "Age(year)",
+       title = "Box plot of Age ")+
+  theme_classic()
+age_box
+```
+
+```{r,echo = FALSE}
+s_plot <- ggplot(mydata_f, aes(x=cps19_age, y=cps19_income_number)) + 
+  geom_point() +
+  labs(x = "Age (year)",
+       y = "Income ($)",
+       title = "Scatter plot of age and income")+ 
+  theme_classic()
+s_plot
+```
+# Graph Discussion
+- My response variable is income, the histogram of the income is not symmetric and it is right skewed, since the left side of the histogram is relative higher than the right side. Therefore, my response variable is not approximately Normal.Additionally, it means that most of people have the income in the range of 3 to 12 million.
+- From the box plot, it shows that the distribution of people's age is nearly symmetric, and the age of most people is between 30-60 years old. Additionally, there is no outlier appears in the plot.Which means there is no people who lives extremely longer than the normal.
+- From the scatter plot, it shows that incoe might not have a relationship with age, since we can not see an increasing pattern from the plot.
+
+# Statisticall Anaylisis
+
+```{r,echo = FALSE}
+linear_model <- lm(cps19_income_number ~ cps19_age, data = mydata_f)
+linear_model
+summary(linear_model)
+```
+- $\hat{yi}$ = expected income
+- $xi$ = age
+- $\hat{b_0}$ = 87503.15
+- $\hat{b_1}$ = -64.16
+
+$$
+\hat{y_i} = \hat{b_0} + \hat{b_1}x_i = 87503.15 - 64.16x_i
+$$
+- $\hat{b_0}$: It means when age is 0, the value of expected average income will be 87503.15. This is unrealistic, since it is impossible for people to have income before birth.
+- $\hat{b_1}$: It means when age increases by 1 , the corresponding expected average income decreases by 64.16.
+
+
+# Weaknesses and next steps
+```{r,echo = FALSE}
+residual <- resid(linear_model)
+qqnorm(residual, main="Normal QQ Plot Residual")
+qqline(residual, col = "red")
+```
+
+- There is a lot of lurking variables of my model, such as gender, education level,and living area.These variables can all change the the income a lot. For example, the person who lives in modern city is more likely to get a better job and earn more than the person who live in the remote area. 
+- Therefore, my weakness is that my model doesn't include many important variables that may change people's income. Therefore, the estimated regression line bases on my data may not accurately illustrate the relationship between age and income for most people. Additionally, from the above qqplot, the residual of my data looks not normal, it violates one of the assumptions of simple linear regression. Therefore, it is another limitation of my model.
+- For improvements, we will consider more variables to analyze and predict the living standard and income of elder people in Canada.
+
+# References
+- @Manual{r,
+    title = {R: A Language and Environment for Statistical Computing},
+    author = {{R Core Team}},
+    organization = {R Foundation for Statistical Computing},
+    address = {Vienna, Austria},
+    year = {2020},
+    url = {https://www.R-project.org/},
+  }
+
+We have invested a lot of time and effort in creating R, please cite it
+when using it for data analysis. See also ‘citation("pkgname")’ for
+citing R packages.
+ 
+ 
+- @article{milligan2008evolution,
+  title={The evolution of elderly poverty in Canada},
+  author={Milligan, Kevin},
+  journal={Canadian Public Policy},
+  volume={34},
+  number={4},
+  pages={S79--S94},
+  year={2008},
+  publisher={University of Toronto Press}
+}
+ 
+ 
+ 
+- @Article{tidyverse,
+    title = {Welcome to the {tidyverse}},
+    author = {Hadley Wickham and Mara Averick and Jennifer Bryan and Winston Chang and Lucy D'Agostino McGowan and Romain François and Garrett Grolemund and Alex Hayes and Lionel Henry and Jim Hester and Max Kuhn and Thomas Lin Pedersen and Evan Miller and Stephan Milton Bache and Kirill Müller and Jeroen Ooms and David Robinson and Dana Paige Seidel and Vitalie Spinu and Kohske Takahashi and Davis Vaughan and Claus Wilke and Kara Woo and Hiroaki Yutani},
+    year = {2019},
+    journal = {Journal of Open Source Software},
+    volume = {4},
+    number = {43},
+    pages = {1686},
+    doi = {10.21105/joss.01686},
+  }
+- @Manual{dplyr,
+    title = {dplyr: A Grammar of Data Manipulation},
+    author = {Hadley Wickham and Romain François and Lionel {
+             Henry} and Kirill Müller},
+    year = {2020},
+    note = {https://dplyr.tidyverse.org, https://github.com/tidyverse/dplyr},
+  }
+  
+- @Manual{skimr,
+    title = {skimr: Compact and Flexible Summaries of Data},
+    author = {Elin Waring and Michael Quinn and Amelia McNamara and Eduardo {Arino de la Rubia} and Hao Zhu and Shannon Ellis},
+    year = {2020},
+    note = {https://docs.ropensci.org/skimr (website),
+https://github.com/ropensci/skimr},
+  } 
+  
+- @Manual{devtools,
+    title = {devtools: Tools to Make Developing R Packages Easier},
+    author = {Hadley Wickham and Jim Hester and Winston Chang},
+    year = {2020},
+    note = {https://devtools.r-lib.org/, https://github.com/r-lib/devtools},
+  }
+  
+  
